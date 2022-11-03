@@ -146,6 +146,14 @@ impl TransactionUnspentOutputs {
         self.0.insert(pos, elem);
     }
 
+    pub fn convert_to_csl(&self) -> cardano_serialization_lib::utils::TransactionUnspentOutputs {
+        let mut out = cardano_serialization_lib::utils::TransactionUnspentOutputs::new();
+        for elem in &self.0 {
+            out.add(&elem.clone());
+        }
+        out
+    }
+
     pub fn find_utxo_index(&self, elem: &TransactionUnspentOutput) -> Option<usize> {
         let elem_hash = elem.input().transaction_id();
         let elem_index = elem.input().index();

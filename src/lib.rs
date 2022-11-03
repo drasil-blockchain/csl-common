@@ -1556,12 +1556,10 @@ pub fn find_suitable_coins(
 }
 
 pub fn blake2b160(data: &[u8]) -> [u8; 20] {
-    //Vec::<u8> {
     let mut digest = [0u8; 20];
-    let mut context = cryptoxide::hashing::blake2b::Blake2b::<20>::new(); //Blake2b::new(20);
+    let mut context = cryptoxide::hashing::blake2b::Blake2b::<160>::new(); //Blake2b::new(20);
     context = context.update(data);
     context.finalize_at(&mut digest);
-    //Blake2b::blake2b(&mut out, data, &[]);
     digest
 }
 
@@ -1670,4 +1668,20 @@ pub fn tx_script_fee(ex_unit_price: ExUnitPrice, steps: u64, mem: u64) -> u64 {
     let tx_script_fee =
         (ex_unit_price.price_memory * mem as f64) + (ex_unit_price.price_steps * steps as f64);
     tx_script_fee.ceil() as u64
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::make_fingerprint;
+
+    #[test]
+    fn test_fingerprint() {
+        let f = make_fingerprint(
+            &"026a18d04a0c642759bb3d83b12e3344894e5c1c7b2aeb1a2113a570".to_owned(),
+            &"5f16b96d4a5135652835a82e46be7bc4b82093d8efdd68bcd74d65dcb7606b8f".to_owned(),
+        )
+        .unwrap();
+        print!("{}", f);
+        assert_eq!(f, "asset1k4x3uyur6j6juh9mwet978vfmuv4ltwlqt24n4");
+    }
 }

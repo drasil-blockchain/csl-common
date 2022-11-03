@@ -1558,9 +1558,9 @@ pub fn find_suitable_coins(
 pub fn blake2b160(data: &[u8]) -> [u8; 20] {
     //Vec::<u8> {
     let mut digest = [0u8; 20];
-    let mut context = Blake2b::new(20);
-    context.input(data);
-    context.result(&mut digest);
+    let mut context = cryptoxide::hashing::blake2b::Blake2b::<20>::new(); //Blake2b::new(20);
+    context = context.update(data);
+    context.finalize_at(&mut digest);
     //Blake2b::blake2b(&mut out, data, &[]);
     digest
 }

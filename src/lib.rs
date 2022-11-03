@@ -1557,12 +1557,12 @@ pub fn find_suitable_coins(
 
 pub fn blake2b160(data: &[u8]) -> [u8; 20] {
     //Vec::<u8> {
-    let mut out = [0u8; 20];
+    let mut digest = [0u8; 20];
     let mut context = Blake2b::new(20);
     context.input(data);
-    context.result(&mut out);
-    Blake2b::blake2b(&mut out, data, &[]);
-    out
+    context.result(&mut digest);
+    //Blake2b::blake2b(&mut out, data, &[]);
+    digest
 }
 
 pub fn make_fingerprint(p: &String, a: &String) -> Result<String, CSLCommonError> {

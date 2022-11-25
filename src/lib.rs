@@ -1,5 +1,6 @@
 pub mod error;
 pub mod models;
+use csl::crypto::Ed25519KeyHash;
 pub use models::*;
 
 use std::ops::{Div, Rem, Sub};
@@ -579,6 +580,24 @@ impl TransactionUnspentOutputs {
         });
         Ok(out)
     }
+
+    pub fn find_utxos_containing_asset(
+        &self,
+        policy: &ScriptHash,
+        assetname: &AssetName,
+    ) -> Result<TransactionUnspentOutputs, CSLCommonError> {
+        let mut out = TransactionUnspentOutputs::new();
+        self.0.iter().for_each(|n| {
+            let ma = n.output().amount().multiasset();
+            if let Some(multi) = ma {
+                let asset = multi.get_asset(policy, assetname);
+                if asset.compare(&to_bignum(0)) == 1 {
+                    out.add(n)
+                }
+            }
+        });
+        Ok(out)
+    }
 }
 impl<'a> FromIterator<&'a TransactionUnspentOutput> for TransactionUnspentOutputs {
     fn from_iter<I: IntoIterator<Item = &'a TransactionUnspentOutput>>(iter: I) -> Self {
@@ -612,6 +631,26 @@ impl ARemove for csl::TransactionOutputs {
         }
         res
     }
+}
+
+pub fn get_pubkeyhash(addr: &Address) -> Result<Ed25519KeyHash, CSLCommonError> {
+    match BaseAddress::from_address(addr) {
+        Some(base) => base.payment_cred().to_keyhash().unwrap(),
+        None => match EnterpriseAddress::from_address(addr) {
+            Some(ent) => match ent.payment_cred().to_keyhash() {
+                Some(keyhash) => keyhash,
+                None => {
+                    return Err(CSLCommonError::Custom(
+                        "address is script address, try get scripthash not keyhash".to_string(),
+                    ))
+                }
+            },
+            None => todo!(),
+        },
+    };
+    Err(CSLCommonError::Custom(
+        "could not extract pubkeyhash".to_string(),
+    ))
 }
 
 pub fn sum_unique_tokens(tokens: &Tokens) -> Tokens {

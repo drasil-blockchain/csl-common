@@ -635,22 +635,17 @@ impl ARemove for csl::TransactionOutputs {
 
 pub fn get_pubkeyhash(addr: &Address) -> Result<Ed25519KeyHash, CSLCommonError> {
     match BaseAddress::from_address(addr) {
-        Some(base) => base.payment_cred().to_keyhash().unwrap(),
+        Some(base) => Ok(base.payment_cred().to_keyhash().unwrap()),
         None => match EnterpriseAddress::from_address(addr) {
             Some(ent) => match ent.payment_cred().to_keyhash() {
-                Some(keyhash) => keyhash,
-                None => {
-                    return Err(CSLCommonError::Custom(
-                        "address is script address, try get scripthash not keyhash".to_string(),
-                    ))
-                }
+                Some(keyhash) => Ok(keyhash),
+                None => Err(CSLCommonError::Custom(
+                    "address is script address, try get scripthash not keyhash".to_string(),
+                )),
             },
             None => todo!(),
         },
-    };
-    Err(CSLCommonError::Custom(
-        "could not extract pubkeyhash".to_string(),
-    ))
+    }
 }
 
 pub fn sum_unique_tokens(tokens: &Tokens) -> Tokens {

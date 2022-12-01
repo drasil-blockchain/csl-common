@@ -184,12 +184,13 @@ impl TransactionUnspentOutputs {
 
         fn get_amount(k: &TransactionUnspentOutput) -> usize {
             let mut acc = 0usize;
-            let policies = k.output().amount().multiasset().unwrap().keys();
-            let assets = k.output().amount().multiasset().unwrap();
-            for policy in 0..policies.len() {
-                acc += assets.get(&policies.get(policy)).unwrap().len();
+            if let Some(multiassets) = k.output().amount().multiasset() {
+                let policies = multiassets.keys();
+                for i in 0..policies.len() {
+                    acc += multiassets.get(&policies.get(i)).unwrap().len();
+                }
+                acc += policies.len() * 1.5 as usize;
             }
-            acc += policies.len() * 1.5 as usize;
             acc
         }
     }

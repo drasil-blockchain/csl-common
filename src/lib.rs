@@ -1218,6 +1218,15 @@ pub fn min_ada_for_utxo(
             let mut v = output.amount().clone();
             v.set_coin(&required_coin);
             output = TransactionOutput::new(&output.address(), &v);
+            if let Some(dh) = output_.data_hash() {
+                output.set_data_hash(&dh)
+            }
+            if let Some(p) = output_.plutus_data() {
+                output.set_plutus_data(&p)
+            }
+            if let Some(sref) = output_.script_ref() {
+                output.set_script_ref(&sref)
+            }
         } else {
             return Ok(output);
         }

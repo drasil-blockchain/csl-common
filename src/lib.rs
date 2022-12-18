@@ -1206,10 +1206,10 @@ pub fn find_assets_in_value(v: &Value, a: &Vec<TokenAsset>) -> (bool, Value, Val
 }
 
 pub fn min_ada_for_utxo(
-    output: &TransactionOutput,
+    output_: &TransactionOutput,
     coins_per_byte: &BigNum,
 ) -> Result<TransactionOutput, CSLCommonError> {
-    let mut output: TransactionOutput = output.clone();
+    let mut output: TransactionOutput = output_.clone();
     for _ in 0..3 {
         let required_coin = to_bignum(output.to_bytes().len() as u64)
             .checked_add(&to_bignum(160))?
@@ -1225,6 +1225,15 @@ pub fn min_ada_for_utxo(
     let mut v = output.amount();
     v.set_coin(&to_bignum(u64::MAX));
     output = TransactionOutput::new(&output.address(), &v);
+    if let Some(dh) = output_.data_hash() {
+        output.set_data_hash(&dh)
+    }
+    if let Some(p) = output_.plutus_data() {
+        output.set_plutus_data(&p)
+    }
+    if let Some(sref) = output_.script_ref() {
+        output.set_script_ref(&sref)
+    }
     min_ada_for_utxo(&output, coins_per_byte)
 }
 

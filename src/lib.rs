@@ -1205,6 +1205,30 @@ pub fn find_assets_in_value(v: &Value, a: &Vec<TokenAsset>) -> (bool, Value, Val
     (flag, new_val, rest_val)
 }
 
+pub fn min_ada_for_utxo(
+    output: &TransactionOutput,
+    coins_per_byte: &BigNum,
+) -> Result<TransactionOutput, CSLCommonError> {
+    let mut output: TransactionOutput = output.clone();
+    for _ in 0..3 {
+        let required_coin = to_bignum(output.to_bytes().len() as u64)
+            .checked_add(&to_bignum(160))?
+            .checked_mul(coins_per_byte)?;
+        if output.amount().coin().less_than(&required_coin) {
+            let mut v = output.amount().clone();
+            v.set_coin(&required_coin);
+            output = TransactionOutput::new(&output.address(), &v);
+        } else {
+            return Ok(output);
+        }
+    }
+    let mut v = output.amount();
+    v.set_coin(&to_bignum(u64::MAX));
+    output = TransactionOutput::new(&output.address(), &v);
+    min_ada_for_utxo(&output, coins_per_byte)
+}
+
+#[deprecated(since = "11.0.0", note = "Use `min_ada_for_output` instead")]
 pub fn calc_min_ada_for_utxo(
     value: &Value,
     dh: Option<DataHash>,

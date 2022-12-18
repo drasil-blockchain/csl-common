@@ -1228,7 +1228,7 @@ pub fn min_ada_for_utxo(
     min_ada_for_utxo(&output, coins_per_byte)
 }
 
-#[deprecated(since = "11.0.0", note = "Use `min_ada_for_output` instead")]
+#[deprecated(since = "0.1.0", note = "Use `min_ada_for_utxo` instead")]
 pub fn calc_min_ada_for_utxo(
     value: &Value,
     dh: Option<DataHash>,

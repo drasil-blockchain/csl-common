@@ -1,5 +1,6 @@
 pub mod error;
 pub mod models;
+use csl::address::ByronAddress;
 use csl::crypto::Ed25519KeyHash;
 pub use models::*;
 
@@ -13,7 +14,7 @@ use cardano_serialization_lib::{
     utils::{from_bignum, to_bignum, BigNum, Value},
     AssetName, MultiAsset,
 };
-use cryptoxide::{blake2b::Blake2b, digest::Digest};
+
 use csl::{PolicyID, TransactionInputs, TransactionOutput, TransactionOutputs};
 use error::CSLCommonError;
 use log::error;
@@ -29,10 +30,19 @@ pub type Tokens = Vec<Token>;
 /// Create cardano address from string
 pub fn addr_from_str(s: &str) -> Result<Address, CSLCommonError> {
     match hex::decode(s) {
-        Ok(bytes) => Ok(Address::from_bytes(bytes)?),
+        Ok(bytes) => match Address::from_bytes(bytes.clone()) {
+            Ok(addr) => Ok(addr),
+            Err(_) => match ByronAddress::from_bytes(bytes) {
+                Ok(addr) => Ok(addr.to_address()),
+                Err(_) => Err(CSLCommonError::CSLError),
+            },
+        },
         Err(_) => match Address::from_bech32(s) {
             Ok(addr) => Ok(addr),
-            Err(_) => Err(CSLCommonError::CSLError),
+            Err(_) => match ByronAddress::from_base58(s) {
+                Ok(addr) => Ok(addr.to_address()),
+                Err(_) => Err(CSLCommonError::CSLError),
+            },
         },
     }
 }
@@ -49,13 +59,13 @@ pub fn decode_transaction_unspent_outputs(
     // Filter exculdes if there are some
     if let Some(enc) = enc_excl {
         for e in enc {
-            utxos = utxos.into_iter().filter(|utxo| *utxo != *e).collect();
+            utxos.retain(|utxo| *utxo != *e);
         }
     }
     // filter collateral if there is some
     if let Some(col) = col_utxo {
         for c in col {
-            utxos = utxos.into_iter().filter(|utxo| *utxo != *c).collect();
+            utxos.retain(|utxo| *utxo != *c);
         }
     }
     // convert to TransactionunspentOutputs
@@ -459,7 +469,7 @@ impl TransactionUnspentOutputs {
         if let Some(b) = band {
             (min, max) = TransactionUnspentOutputs::band_value(value, b);
         }
-        println!("Band Values: Min: {:?}; Max: {:?}", min, max);
+        println!("Band Values: Min: {min:?}; Max: {max:?}");
         let f: TransactionUnspentOutputs = self
             .0
             .iter()
@@ -573,9 +583,8 @@ impl TransactionUnspentOutputs {
             let ma = n.output().amount().multiasset();
             if let Some(multi) = ma {
                 let policies = multi.get(&policy);
-                match policies {
-                    Some(_) => out.add(n),
-                    None => {}
+                if policies.is_some() {
+                    out.add(n)
                 }
             }
         });
@@ -749,14 +758,11 @@ pub fn check_overhead_tokens(tok_l: &Tokens, tok_r: &Tokens) -> Tokens {
 pub fn acc_tokens(tok_l: &Tokens, tok_r: &Tokens) -> Tokens {
     let mut out = Tokens::new();
     for tok in tok_l {
-        match find_tokenindex_by_policy_assetname(tok_r, &tok.0, &tok.1) {
-            Some(s) => {
-                let r = tok.2.clamped_sub(&tok_r[s].2);
-                if from_bignum(&r) == 0 {
-                    out.push((tok.0.clone(), tok.1.clone(), tok.2))
-                }
+        if let Some(s) = find_tokenindex_by_policy_assetname(tok_r, &tok.0, &tok.1) {
+            let r = tok.2.clamped_sub(&tok_r[s].2);
+            if from_bignum(&r) == 0 {
+                out.push((tok.0.clone(), tok.1.clone(), tok.2))
             }
-            None => {}
         }
     }
 
@@ -1352,7 +1358,7 @@ pub async fn submit_endpoint(
     match tokio::time::timeout(std::time::Duration::from_secs(5), &mut response).await {
         Err(_) => Ok((
             "".to_string(),
-            format!("ERROR: '{:?}' is not available", endpoint),
+            format!("ERROR: '{endpoint:?}' is not available"),
             false,
         )),
         Ok(no_timeout) => match no_timeout {
@@ -1362,7 +1368,7 @@ pub async fn submit_endpoint(
                 let r_status = resp.status();
                 let resp_text = resp.text().await?;
                 if r_status != http::StatusCode::ACCEPTED {
-                    err = format!("ERROR on tx submission: {:?}", resp_text);
+                    err = format!("ERROR on tx submission: {resp_text:?}");
                 } else {
                     txhash = resp_text.replace('\"', "");
                 }
@@ -1372,7 +1378,7 @@ pub async fn submit_endpoint(
             }
             Err(e) => Ok((
                 "".to_string(),
-                format!("ERROR: '{:?}' is not available", e),
+                format!("ERROR: '{e:?}' is not available"),
                 false,
             )),
         },
@@ -1550,7 +1556,7 @@ pub fn find_suitable_coins(
     overhead: u64,
 ) -> (Option<TransactionUnspentOutputs>, u64) {
     let coins = from_bignum(&nv.coin());
-    let max_coins = coins + (coins / 100 * overhead as u64); // Coins + Overhead in %
+    let max_coins = coins + (coins / 100 * overhead); // Coins + Overhead in %
 
     let mut acc = 0u64;
     let mut selection = TransactionUnspentOutputs::new();
@@ -1670,13 +1676,10 @@ pub fn get_vkey_count(
             addresses.push(txuos.get(txi).output().address().to_bytes());
         }
     }
-    match col {
-        Some(c) => {
-            if !txuos.contains_address(c.output().address()) {
-                vkey_counter += 1;
-            }
+    if let Some(c) = col {
+        if !txuos.contains_address(c.output().address()) {
+            vkey_counter += 1;
         }
-        None => {}
     }
     vkey_counter
 }
@@ -1758,7 +1761,7 @@ mod tests {
             &"5f16b96d4a5135652835a82e46be7bc4b82093d8efdd68bcd74d65dcb7606b8f".to_owned(),
         )
         .unwrap();
-        print!("{}", f);
+        print!("{f}");
         assert_eq!(f, "asset1k4x3uyur6j6juh9mwet978vfmuv4ltwlqt24n4");
     }
 }
